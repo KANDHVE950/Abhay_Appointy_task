@@ -10,6 +10,7 @@ import (
     "io/ioutil"
     "strings"
     "strconv"
+    "sync"
 )
 // Defining the data structure for article
 type Article struct {          
@@ -23,6 +24,9 @@ type Article struct {
 // Creating slices of articles 
 var allArticles []Article
 
+var mutex sync.Mutex
+var wg sync.WaitGroup
+
 
 func homePage(w http.ResponseWriter, r *http.Request) {
 
@@ -33,7 +37,7 @@ func homePage(w http.ResponseWriter, r *http.Request) {
     }
 	// splitting the url into a list
 	path := strings.Split(r.URL.Path, "/")
-	fmt.Println(path)
+	// fmt.Println(path)
 
 	if len(path) == 3 {
 		if path[1] == "articles" {
@@ -48,7 +52,9 @@ func homePage(w http.ResponseWriter, r *http.Request) {
 	
 }
 
-func createArticle(w http.ResponseWriter, r *http.Request) {
+func createArticle(w http.ResponseWriter, r *http.Request, wg *sync.WaitGroup) {
+
+	mutex.Lock()
 
 	var newArticle Article
 	reqBody, err := ioutil.ReadAll(r.Body)
@@ -70,6 +76,9 @@ func createArticle(w http.ResponseWriter, r *http.Request) {
 	// Return the newly created event
 	fmt.Fprintf(w, "New article is created.")
 	json.NewEncoder(w).Encode(newArticle)
+
+	mutex.Unlock()
+	wg.Done()
 }
 
 func listallArticles(w http.ResponseWriter, r *http.Request) {
@@ -87,7 +96,9 @@ func createandlistArticles(w http.ResponseWriter, r *http.Request) {
     // /articles url is used  for creating new artcles and listing all articles in memory so here switch method is used in case of post and get request
     switch r.Method {
     case "POST":
-    	createArticle(w, r)
+    	wg.Add(1)
+    	createArticle(w, r, &wg)
+    	wg.Wait()
     case "GET":
     	listallArticles(w, r)
     default:
